@@ -1,0 +1,67 @@
+name: Construire les packs d'adresses
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-address-packs.yml"
+      - "tools/**"
+      - "requirements-addresses.txt"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: address-packs
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      OVERTURE_RELEASE: "2026-07-22.0"
+      RELEASE_TAG: "addresses-2026-07-22"
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer DuckDB
+        run: python -m pip install -r requirements-addresses.txt
+
+      - name: Construire les packs Suisse, Espagne et France
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build output
+          for country in CH ES FR; do
+            python tools/extract_overture_addresses.py               --country "$country"               --release "$OVERTURE_RELEASE"               --output "build/$country-addresses.parquet"
+            python tools/build_address_pack.py               --country "$country"               --release "$OVERTURE_RELEASE"               --input "build/$country-addresses.parquet"               --output "build/$country.owga"
+          done
+
+      - name: Compresser les packs
+        shell: bash
+        run: |
+          set -euo pipefail
+          gzip -n -6 -c build/CH.owga > output/OfflineWorldGPS-Adresses-Suisse.owga.gz
+          gzip -n -6 -c build/ES.owga > output/OfflineWorldGPS-Adresses-Espagne.owga.gz
+          python tools/split_address_pack.py             --input build/FR.owga             --pack-id france             --output-1 output/OfflineWorldGPS-Adresses-France-Partie-1.owga.gz             --output-2 output/OfflineWorldGPS-Adresses-France-Partie-2.owga.gz
+          cd output
+          sha256sum *.gz > SHA256SUMS.txt
+
+      - name: Publier les téléchargements
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG"             output/OfflineWorldGPS-Adresses-Suisse.owga.gz             output/OfflineWorldGPS-Adresses-Espagne.owga.gz             output/OfflineWorldGPS-Adresses-France-Partie-1.owga.gz             output/OfflineWorldGPS-Adresses-France-Partie-2.owga.gz             output/SHA256SUMS.txt             --title "Packs d'adresses hors ligne"             --notes "Packs d'adresses OfflineWorldGPS pour la Suisse, la France et l'Espagne. Données Overture Maps, version $OVERTURE_RELEASE."
