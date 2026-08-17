@@ -34,6 +34,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: requirements-addresses.txt
 
       - name: Installer DuckDB
         run: python -m pip install -r requirements-addresses.txt
@@ -44,8 +45,8 @@ jobs:
           set -euo pipefail
           mkdir -p build output
           for country in CH ES FR; do
-            python tools/extract_overture_addresses.py               --country "$country"               --release "$OVERTURE_RELEASE"               --output "build/$country-addresses.parquet"
-            python tools/build_address_pack.py               --country "$country"               --release "$OVERTURE_RELEASE"               --input "build/$country-addresses.parquet"               --output "build/$country.owga"
+            python tools/extract_overture_addresses.py --country "$country" --release "$OVERTURE_RELEASE" --output "build/$country-addresses.parquet"
+            python tools/build_address_pack.py --country "$country" --release "$OVERTURE_RELEASE" --input "build/$country-addresses.parquet" --output "build/$country.owga"
           done
 
       - name: Compresser les packs
@@ -54,7 +55,7 @@ jobs:
           set -euo pipefail
           gzip -n -6 -c build/CH.owga > output/OfflineWorldGPS-Adresses-Suisse.owga.gz
           gzip -n -6 -c build/ES.owga > output/OfflineWorldGPS-Adresses-Espagne.owga.gz
-          python tools/split_address_pack.py             --input build/FR.owga             --pack-id france             --output-1 output/OfflineWorldGPS-Adresses-France-Partie-1.owga.gz             --output-2 output/OfflineWorldGPS-Adresses-France-Partie-2.owga.gz
+          python tools/split_address_pack.py --input build/FR.owga --pack-id france --output-1 output/OfflineWorldGPS-Adresses-France-Partie-1.owga.gz --output-2 output/OfflineWorldGPS-Adresses-France-Partie-2.owga.gz
           cd output
           sha256sum *.gz > SHA256SUMS.txt
 
@@ -64,4 +65,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$RELEASE_TAG"             output/OfflineWorldGPS-Adresses-Suisse.owga.gz             output/OfflineWorldGPS-Adresses-Espagne.owga.gz             output/OfflineWorldGPS-Adresses-France-Partie-1.owga.gz             output/OfflineWorldGPS-Adresses-France-Partie-2.owga.gz             output/SHA256SUMS.txt             --title "Packs d'adresses hors ligne"             --notes "Packs d'adresses OfflineWorldGPS pour la Suisse, la France et l'Espagne. Données Overture Maps, version $OVERTURE_RELEASE."
+          gh release create "$RELEASE_TAG" output/OfflineWorldGPS-Adresses-Suisse.owga.gz output/OfflineWorldGPS-Adresses-Espagne.owga.gz output/OfflineWorldGPS-Adresses-France-Partie-1.owga.gz output/OfflineWorldGPS-Adresses-France-Partie-2.owga.gz output/SHA256SUMS.txt --title "Packs d'adresses hors ligne" --notes "Packs d'adresses OfflineWorldGPS pour la Suisse, la France et l'Espagne. Données Overture Maps, version $OVERTURE_RELEASE."
