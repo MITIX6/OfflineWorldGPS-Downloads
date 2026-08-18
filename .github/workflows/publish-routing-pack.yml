@@ -1,0 +1,40 @@
+name: Publish Swiss routing pack
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/publish-routing-pack.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: routing-switzerland-2026-08-18
+      SOURCE_RUN: "32108730707"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download verified routing artifact
+        run: |
+          mkdir -p release
+          gh run download "$SOURCE_RUN" --name "OfflineWorldGPS-Routage-Suisse" --dir release
+          sha256sum --check release/SHA256SUMS-routing.txt
+
+      - name: Ensure the tag is new
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to replace it."
+            exit 1
+          fi
+
+      - name: Publish public routing download
+        run: |
+          gh release create "$TAG"             "release/OfflineWorldGPS-Routage-Suisse.owgr.gz#Routage automobile Suisse"             "release/SHA256SUMS-routing.txt#Somme de contrôle SHA-256"             --title "OfflineWorldGPS - Routage automobile Suisse"             --notes "Pack routier automobile hors ligne pour OfflineWorldGPS V4. Données OpenStreetMap extraites par Geofabrik. Le fichier compressé fait environ 60 Mio et occupe environ 201 Mio après installation."
