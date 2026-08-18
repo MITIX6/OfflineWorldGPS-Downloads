@@ -1,0 +1,44 @@
+name: Publish Spain routing pack
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/publish-routing-spain.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: routing-spain-2026-08-18
+      SOURCE_RUN: "32156790294"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download verified routing artifact
+        run: |
+          mkdir -p release
+          gh run download "$SOURCE_RUN" --name "OfflineWorldGPS-Routage-Espagne" --dir release
+          sha256sum --check release/SHA256SUMS-routing-spain.txt
+
+      - name: Ensure the tag is new
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to replace it."
+            exit 1
+          fi
+
+      - name: Publish public routing download
+        run: |
+          gh release create "$TAG" \
+            "release/OfflineWorldGPS-Routage-Espagne.owgr.gz#Routage automobile Espagne" \
+            "release/SHA256SUMS-routing-spain.txt#Somme de contrôle SHA-256" \
+            --title "OfflineWorldGPS - Routage automobile Espagne" \
+            --notes "Pack routier automobile hors ligne pour OfflineWorldGPS V4.1. Données OpenStreetMap extraites par Geofabrik. Le fichier compressé fait environ 215 Mio et occupe environ 678 Mio après installation."
