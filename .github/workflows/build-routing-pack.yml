@@ -1,0 +1,61 @@
+name: Build Swiss routing pack
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/build_routing_pack.py"
+      - "requirements-routing.txt"
+      - ".github/workflows/build-routing-pack.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-swiss-routing-pack
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-routing.txt
+
+      - name: Install routing builder
+        run: pip install -r requirements-routing.txt
+
+      - name: Download current Switzerland OpenStreetMap extract
+        run: |
+          mkdir -p routing-work
+          curl --fail --location --retry 5 \
+            https://download.geofabrik.de/europe/switzerland-latest.osm.pbf \
+            --output routing-work/switzerland-latest.osm.pbf
+
+      - name: Build compact car-routing graph
+        run: |
+          mkdir -p release
+          python tools/build_routing_pack.py \
+            --input routing-work/switzerland-latest.osm.pbf \
+            --output routing-work/OfflineWorldGPS-Routage-Suisse.owgr \
+            --gzip-output release/OfflineWorldGPS-Routage-Suisse.owgr.gz
+          sha256sum release/OfflineWorldGPS-Routage-Suisse.owgr.gz \
+            > release/SHA256SUMS-routing.txt
+          ls -lh routing-work/OfflineWorldGPS-Routage-Suisse.owgr release/*
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OfflineWorldGPS-Routage-Suisse
+          path: release/*
+          if-no-files-found: error
+          compression-level: 0
