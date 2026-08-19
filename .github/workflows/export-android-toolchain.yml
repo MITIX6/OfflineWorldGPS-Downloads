@@ -43,6 +43,9 @@ jobs:
               id("com.android.application") version "8.2.2" apply false
           }
           EOF
+          cat > probe/gradle.properties <<'EOF'
+          android.useAndroidX=true
+          EOF
           cat > probe/app/build.gradle.kts <<'EOF'
           plugins { id("com.android.application") }
           android {
