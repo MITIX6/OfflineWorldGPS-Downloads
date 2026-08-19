@@ -1,0 +1,80 @@
+name: Export Android offline toolchain
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/export-android-toolchain.yml
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2.1'
+
+      - name: Resolve the exact OfflineWorldGPS build dependencies
+        run: |
+          mkdir -p probe/app/src/main/java/example probe/app/src/main
+          cat > probe/settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "OfflineWorldGPSDependencyProbe"
+          include(":app")
+          EOF
+          cat > probe/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "8.2.2" apply false
+          }
+          EOF
+          cat > probe/app/build.gradle.kts <<'EOF'
+          plugins { id("com.android.application") }
+          android {
+              namespace = "example"
+              compileSdk = 34
+              defaultConfig { applicationId = "example"; minSdk = 26; targetSdk = 34 }
+          }
+          dependencies { implementation("org.maplibre.gl:android-sdk:11.8.0") }
+          EOF
+          cat > probe/app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"><application /></manifest>
+          EOF
+          cat > probe/app/src/main/java/example/Probe.java <<'EOF'
+          package example;
+          public final class Probe { org.maplibre.android.maps.MapView map; }
+          EOF
+          cd probe
+          gradle --no-daemon assembleRelease
+
+      - name: Pack Gradle modules and Android SDK 34
+        run: |
+          mkdir -p export/gradle/caches export/android-sdk/platforms export/android-sdk/build-tools
+          cp -a "$HOME/.gradle/caches/modules-2" export/gradle/caches/
+          cp -a "$ANDROID_HOME/platforms/android-34" export/android-sdk/platforms/
+          cp -a "$ANDROID_HOME/build-tools/34.0.0" export/android-sdk/build-tools/
+          tar -C export -czf android-offline-toolchain.tgz gradle android-sdk
+          sha256sum android-offline-toolchain.tgz
+          du -h android-offline-toolchain.tgz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-offline-toolchain
+          path: android-offline-toolchain.tgz
+          compression-level: 0
+          retention-days: 2
