@@ -49,9 +49,9 @@ jobs:
           cat > probe/app/build.gradle.kts <<'EOF'
           plugins { id("com.android.application") }
           android {
-              namespace = "example"
+              namespace = "com.example.probe"
               compileSdk = 34
-              defaultConfig { applicationId = "example"; minSdk = 26; targetSdk = 34 }
+              defaultConfig { applicationId = "com.example.probe"; minSdk = 26; targetSdk = 34 }
           }
           dependencies { implementation("org.maplibre.gl:android-sdk:11.8.0") }
           EOF
@@ -59,11 +59,11 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"><application /></manifest>
           EOF
           cat > probe/app/src/main/java/example/Probe.java <<'EOF'
-          package example;
+          package com.example.probe;
           public final class Probe { org.maplibre.android.maps.MapView map; }
           EOF
           cd probe
-          gradle --no-daemon :app:dependencies --configuration releaseRuntimeClasspath
+          gradle --no-daemon assembleRelease
 
       - name: Pack Gradle modules and Android SDK 34
         run: |
