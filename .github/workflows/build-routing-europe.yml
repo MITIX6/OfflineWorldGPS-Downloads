@@ -1,0 +1,97 @@
+name: Build and publish Europe routing pack
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/build-routing-europe.yml
+      - tools/merge_routing_packs.py
+      - tools/test_routing_pack.cpp
+
+permissions:
+  contents: write
+
+concurrency:
+  group: routing-europe-southwest-v1
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: routing-europe-southwest-2026-08-19-v1
+  RELEASE_FILE: OfflineWorldGPS-Routage-Europe.owgr.gz
+
+jobs:
+  build-test-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that this release is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; refusing to overwrite it."
+            exit 1
+          fi
+
+      - name: Install merge dependency
+        run: python3 -m pip install --disable-pip-version-check numpy
+
+      - name: Download and verify the three country graphs
+        run: |
+          mkdir -p routing-input routing-output
+          curl --fail --location --retry 5 --retry-all-errors \
+            --output routing-input/switzerland.owgr.gz \
+            https://github.com/MITIX6/OfflineWorldGPS-Downloads/releases/download/routing-switzerland-2026-08-18/OfflineWorldGPS-Routage-Suisse.owgr.gz
+          curl --fail --location --retry 5 --retry-all-errors \
+            --output routing-input/france.owgr.gz \
+            https://github.com/MITIX6/OfflineWorldGPS-Downloads/releases/download/routing-france-2026-08-18/OfflineWorldGPS-Routage-France.owgr.gz
+          curl --fail --location --retry 5 --retry-all-errors \
+            --output routing-input/spain.owgr.gz \
+            https://github.com/MITIX6/OfflineWorldGPS-Downloads/releases/download/routing-spain-2026-08-18/OfflineWorldGPS-Routage-Espagne.owgr.gz
+          cd routing-input
+          sha256sum -c <<'CHECKSUMS'
+          5b0dac772c2ea01cadb3d85f59d43209fdc9652ca0bb9df432bb5c929a2e506a  switzerland.owgr.gz
+          83d361ebc9cfef4c6a0e879dc853d9a51b214d53ed7564646c69f69c20d46dfd  france.owgr.gz
+          c1de655bb9bcdafac421d032eb391d8178c3cc54a47e623fc2caadc0155cd888  spain.owgr.gz
+          CHECKSUMS
+          gzip -dk switzerland.owgr.gz
+          gzip -dk france.owgr.gz
+          gzip -dk spain.owgr.gz
+
+      - name: Merge cross-border roads and Mallorca ferry
+        run: |
+          python3 tools/merge_routing_packs.py \
+            --graph spain=routing-input/spain.owgr \
+            --graph france=routing-input/france.owgr \
+            --graph switzerland=routing-input/switzerland.owgr \
+            --output routing-output/OfflineWorldGPS-Routage-Europe.owgr \
+            --gzip-output "routing-output/$RELEASE_FILE"
+
+      - name: Test a complete Mallorca to Geneva route
+        run: |
+          g++ -O3 -std=c++17 tools/test_routing_pack.cpp \
+            -o routing-output/test_routing_pack
+          routing-output/test_routing_pack \
+            routing-output/OfflineWorldGPS-Routage-Europe.owgr
+
+      - name: Record file details
+        run: |
+          cd routing-output
+          sha256sum "$RELEASE_FILE" | tee "$RELEASE_FILE.sha256"
+          stat --printf='compressed_bytes=%s\n' "$RELEASE_FILE" | tee release-metadata.txt
+          stat --printf='installed_bytes=%s\n' OfflineWorldGPS-Routage-Europe.owgr \
+            | tee -a release-metadata.txt
+          cat release-metadata.txt
+
+      - name: Publish immutable public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "routing-output/$RELEASE_FILE#Routage Europe Suisse-France-Espagne" \
+            "routing-output/$RELEASE_FILE.sha256#Somme SHA-256" \
+            --title "OfflineWorldGPS - Routage Europe hors ligne" \
+            --notes "Pack automobile hors ligne unifié pour l'Espagne, la France et la Suisse. Il permet les trajets entre pays et comprend la liaison ferry Palma-Barcelone. Le calcul GPS reste hors ligne après installation; les horaires et réservations de ferry ne sont pas inclus."
