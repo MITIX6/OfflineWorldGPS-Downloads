@@ -63,7 +63,7 @@ jobs:
           public final class Probe { org.maplibre.android.maps.MapView map; }
           EOF
           cd probe
-          gradle --no-daemon assembleRelease
+          gradle --no-daemon :app:dependencies --configuration releaseRuntimeClasspath
 
       - name: Pack Gradle modules and Android SDK 34
         run: |
