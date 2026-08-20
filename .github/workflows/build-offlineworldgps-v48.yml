@@ -5,13 +5,13 @@ on:
     branches:
       - offlineworldgps-v4-8
     paths:
-      - "ci/OfflineWorldGPS-V4.8-Detailed-Offline-Source.zip"
+      - "ci/source.part-*"
       - ".github/workflows/build-offlineworldgps-v48.yml"
   pull_request:
     branches:
       - main
     paths:
-      - "ci/OfflineWorldGPS-V4.8-Detailed-Offline-Source.zip"
+      - "ci/source.part-*"
       - ".github/workflows/build-offlineworldgps-v48.yml"
   workflow_dispatch:
 
@@ -46,7 +46,9 @@ jobs:
       - name: Extract V4.8 source
         run: |
           mkdir -p /tmp/offlineworldgps-v48
-          unzip -q ci/OfflineWorldGPS-V4.8-Detailed-Offline-Source.zip -d /tmp/offlineworldgps-v48
+          cat ci/source.part-* > /tmp/OfflineWorldGPS-V4.8-Source.zip
+          unzip -t /tmp/OfflineWorldGPS-V4.8-Source.zip
+          unzip -q /tmp/OfflineWorldGPS-V4.8-Source.zip -d /tmp/offlineworldgps-v48
 
       - name: Build release APK
         working-directory: /tmp/offlineworldgps-v48/OfflineWorldGPS-V4.8-Source
