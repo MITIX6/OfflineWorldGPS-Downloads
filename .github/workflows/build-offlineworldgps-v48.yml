@@ -7,6 +7,12 @@ on:
     paths:
       - "ci/OfflineWorldGPS-V4.8-Detailed-Offline-Source.zip"
       - ".github/workflows/build-offlineworldgps-v48.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci/OfflineWorldGPS-V4.8-Detailed-Offline-Source.zip"
+      - ".github/workflows/build-offlineworldgps-v48.yml"
   workflow_dispatch:
 
 permissions:
