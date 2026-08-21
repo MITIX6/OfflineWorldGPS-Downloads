@@ -98,8 +98,9 @@ jobs:
           BBOX: ${{ matrix.bbox }}
         run: |
           source_url="https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/${OVERTURE_RELEASE}/buildings.pmtiles"
-          "$HOME/go/bin/pmtiles" extract "$source_url" "$FILE_NAME" --bbox="$BBOX"
-          "$HOME/go/bin/pmtiles" show "$FILE_NAME"
+          pmtiles_bin="$(go env GOPATH)/bin/go-pmtiles"
+          "$pmtiles_bin" extract "$source_url" "$FILE_NAME" --bbox="$BBOX"
+          "$pmtiles_bin" show "$FILE_NAME"
           size="$(stat -c %s "$FILE_NAME")"
           if [ "$size" -ge 2000000000 ]; then
             echo "Archive too large for one GitHub release asset: $size bytes" >&2
