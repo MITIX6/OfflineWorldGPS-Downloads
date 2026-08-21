@@ -1,4 +1,4 @@
-name: Build OfflineWorldGPS V4.8
+name: Build OfflineWorldGPS V4.9
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
       - offlineworldgps-v4-8
     paths:
       - "ci/source.part-*"
-      - ".github/workflows/build-offlineworldgps-v48.yml"
+      - ".github/workflows/build-offlineworldgps-v49.yml"
   pull_request:
     branches:
       - main
     paths:
       - "ci/source.part-*"
-      - ".github/workflows/build-offlineworldgps-v48.yml"
+      - ".github/workflows/build-offlineworldgps-v49.yml"
   workflow_dispatch:
 
 permissions:
@@ -43,15 +43,15 @@ jobs:
       - name: Android SDK 34
         run: yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0"
 
-      - name: Extract V4.8 source
+      - name: Extract V4.9 source
         run: |
-          mkdir -p /tmp/offlineworldgps-v48
-          cat ci/source.part-* > /tmp/OfflineWorldGPS-V4.8-Source.zip
-          unzip -t /tmp/OfflineWorldGPS-V4.8-Source.zip
-          unzip -q /tmp/OfflineWorldGPS-V4.8-Source.zip -d /tmp/offlineworldgps-v48
+          mkdir -p /tmp/offlineworldgps-v49
+          cat ci/source.part-* > /tmp/OfflineWorldGPS-V4.9-Source.zip
+          unzip -t /tmp/OfflineWorldGPS-V4.9-Source.zip
+          unzip -q /tmp/OfflineWorldGPS-V4.9-Source.zip -d /tmp/offlineworldgps-v49
 
       - name: Build release APK
-        working-directory: /tmp/offlineworldgps-v48/OfflineWorldGPS-V4.8-Source
+        working-directory: /tmp/offlineworldgps-v49/OfflineWorldGPS-V4.9-Source
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon clean assembleRelease
@@ -59,7 +59,7 @@ jobs:
       - name: Collect APK signing tools
         run: |
           mkdir -p deliverables
-          cp /tmp/offlineworldgps-v48/OfflineWorldGPS-V4.8-Source/app/build/outputs/apk/release/app-release-unsigned.apk deliverables/OfflineWorldGPS-V4.8-unsigned.apk
+          cp /tmp/offlineworldgps-v49/OfflineWorldGPS-V4.9-Source/app/build/outputs/apk/release/app-release-unsigned.apk deliverables/OfflineWorldGPS-V4.9-unsigned.apk
           cp "$ANDROID_HOME/build-tools/34.0.0/lib/apksigner.jar" deliverables/apksigner.jar
           cp "$ANDROID_HOME/build-tools/34.0.0/zipalign" deliverables/zipalign
           chmod +x deliverables/zipalign
@@ -67,7 +67,7 @@ jobs:
       - name: Upload unsigned APK
         uses: actions/upload-artifact@v4
         with:
-          name: OfflineWorldGPS-V4.8-unsigned
+          name: OfflineWorldGPS-V4.9-unsigned
           path: deliverables/
           if-no-files-found: error
           retention-days: 7

@@ -1,0 +1,113 @@
+name: Publish Overture building packs
+
+on:
+  push:
+    branches:
+      - offlineworldgps-v4-8
+    paths:
+      - ".github/workflows/build-buildings-overture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  OVERTURE_RELEASE: 2026-08-19.0
+  PACK_RELEASE_TAG: buildings-overture-2026-08-19-v1
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release when needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$PACK_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$PACK_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "OfflineWorldGPS — bâtiments Overture 2026-08-19" \
+              --notes "Packs PMTiles régionaux pour l’affichage détaillé hors ligne. Données Overture Maps Foundation, comprenant OpenStreetMap et les autres sources ouvertes indiquées par Overture."
+          fi
+
+  extract-and-publish:
+    needs: create-release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - file: OfflineWorldGPS-Batiments-Suisse-01.pmtiles
+            bbox: "5.800000,45.700000,8.250000,46.800000"
+          - file: OfflineWorldGPS-Batiments-Suisse-02.pmtiles
+            bbox: "8.250000,45.700000,10.700000,46.800000"
+          - file: OfflineWorldGPS-Batiments-Suisse-03.pmtiles
+            bbox: "5.800000,46.800000,8.250000,47.900000"
+          - file: OfflineWorldGPS-Batiments-Suisse-04.pmtiles
+            bbox: "8.250000,46.800000,10.700000,47.900000"
+
+          - file: OfflineWorldGPS-Batiments-France-01.pmtiles
+            bbox: "-5.500000,41.000000,-0.400000,44.433333"
+          - file: OfflineWorldGPS-Batiments-France-02.pmtiles
+            bbox: "-0.400000,41.000000,4.700000,44.433333"
+          - file: OfflineWorldGPS-Batiments-France-03.pmtiles
+            bbox: "4.700000,41.000000,9.800000,44.433333"
+          - file: OfflineWorldGPS-Batiments-France-04.pmtiles
+            bbox: "-5.500000,44.433333,-0.400000,47.866667"
+          - file: OfflineWorldGPS-Batiments-France-05.pmtiles
+            bbox: "-0.400000,44.433333,4.700000,47.866667"
+          - file: OfflineWorldGPS-Batiments-France-06.pmtiles
+            bbox: "4.700000,44.433333,9.800000,47.866667"
+          - file: OfflineWorldGPS-Batiments-France-07.pmtiles
+            bbox: "-5.500000,47.866667,-0.400000,51.300000"
+          - file: OfflineWorldGPS-Batiments-France-08.pmtiles
+            bbox: "-0.400000,47.866667,4.700000,51.300000"
+          - file: OfflineWorldGPS-Batiments-France-09.pmtiles
+            bbox: "4.700000,47.866667,9.800000,51.300000"
+
+          - file: OfflineWorldGPS-Batiments-Espagne-01.pmtiles
+            bbox: "-9.500000,35.500000,-4.800000,38.433333"
+          - file: OfflineWorldGPS-Batiments-Espagne-02.pmtiles
+            bbox: "-4.800000,35.500000,-0.100000,38.433333"
+          - file: OfflineWorldGPS-Batiments-Espagne-03.pmtiles
+            bbox: "-0.100000,35.500000,4.600000,38.433333"
+          - file: OfflineWorldGPS-Batiments-Espagne-04.pmtiles
+            bbox: "-9.500000,38.433333,-4.800000,41.366667"
+          - file: OfflineWorldGPS-Batiments-Espagne-05.pmtiles
+            bbox: "-4.800000,38.433333,-0.100000,41.366667"
+          - file: OfflineWorldGPS-Batiments-Espagne-06.pmtiles
+            bbox: "-0.100000,38.433333,4.600000,41.366667"
+          - file: OfflineWorldGPS-Batiments-Espagne-07.pmtiles
+            bbox: "-9.500000,41.366667,-4.800000,44.300000"
+          - file: OfflineWorldGPS-Batiments-Espagne-08.pmtiles
+            bbox: "-4.800000,41.366667,-0.100000,44.300000"
+          - file: OfflineWorldGPS-Batiments-Espagne-09.pmtiles
+            bbox: "-0.100000,41.366667,4.600000,44.300000"
+
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+
+      - name: Install PMTiles CLI
+        run: go install github.com/protomaps/go-pmtiles@v1.31.2
+
+      - name: Extract regional archive
+        env:
+          FILE_NAME: ${{ matrix.file }}
+          BBOX: ${{ matrix.bbox }}
+        run: |
+          source_url="https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/${OVERTURE_RELEASE}/buildings.pmtiles"
+          "$HOME/go/bin/pmtiles" extract "$source_url" "$FILE_NAME" --bbox="$BBOX"
+          "$HOME/go/bin/pmtiles" show "$FILE_NAME"
+          size="$(stat -c %s "$FILE_NAME")"
+          if [ "$size" -ge 2000000000 ]; then
+            echo "Archive too large for one GitHub release asset: $size bytes" >&2
+            exit 1
+          fi
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FILE_NAME: ${{ matrix.file }}
+        run: gh release upload "$PACK_RELEASE_TAG" "$FILE_NAME" --clobber --repo "$GITHUB_REPOSITORY"
